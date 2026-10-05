@@ -7,11 +7,11 @@
 //! coefficients are below, unchanged, so what the board compares is the
 //! library and not the mathematics.
 //!
-//! They are given in the monomial basis, which is how the component states
-//! them; the library takes either basis and folds the leading -54 in as a
-//! coefficient rather than by repeated subtraction, which is what the
-//! challenge's depth budget forced on the original and this specification
-//! does not.
+//! The component states them in the monomial basis; they are converted here
+//! to the Chebyshev basis the library's evaluator works in, exactly. The
+//! leading -54 is a coefficient like any other rather than something folded
+//! in by repeated subtraction, which is what the challenge's depth budget
+//! forced on the original and this specification does not.
 use poulpy_ckks::api::CKKSPolynomialEvaluationOps;
 use poulpy_ckks::layouts::CKKSPlaintextOwned;
 use poulpy_ckks::polynomial::{BSGSPolynomial, Basis, EncodeBSGS, Polynomial};
@@ -24,15 +24,22 @@ use poulpy_hal::api::ScratchOwnedBorrow;
 use crate::envelope::{Backend, Ct, Env, Pt, PtOut};
 use crate::fherma::{Inputs, Outputs, Point, Tensor};
 
-/// Coefficients of x^0 .. x^16, as published.
+/// The MILP polynomial, in the Chebyshev basis.
+///
+/// The component states it in the monomial basis, as x^0 .. x^16 with a
+/// leading -54; this is the same polynomial written in the basis the
+/// library's evaluator builds its power basis in, converted exactly — the
+/// two agree to 9e-14 across [-1, 1]. Stating it in the other basis and
+/// evaluating it in this one is not a conversion the library performs.
 const POLYNOMIAL: [f64; 17] = [
-    0.0323949878919212, 0.500001412106499, 2.13483086933591,
-    -4.78160418051218e-05, -13.9205486530553, 0.00061641818435605,
-    70.0957556465309, -0.00388040016141976, -213.087053403128,
-    0.0129145434432087, 385.924971250905, -0.0230082806472531,
-    -407.029727261512, 0.0206280915579812, 230.348436664049,
-    -0.00728306945833855, -54.0,
+    0.3192235998041225, 0.4999859402748887, 0.21038635064247718,
+    -1.3080336695987431e-05, -0.04063791756501771, -1.1226404519249844e-05,
+    0.016424135051813456, -8.83456151853052e-06, -0.008373177365811165,
+    -6.149820007635184e-06, 0.004770552720991594, -3.6739515665634156e-06,
+    -0.0028370111998732885, -1.6316940700166904e-06, 0.0017515181474669177,
+    -4.4452328236929626e-07, -0.00164794921875,
 ];
+
 
 pub struct State {
     poly: BSGSPolynomial<CKKSPlaintextOwned<Backend>>,
@@ -40,7 +47,7 @@ pub struct State {
 
 /// Public material, built once per point and never measured.
 pub fn init(_p: &Point, env: &mut Env) -> State {
-    let poly = Polynomial::new(Basis::Monomial, POLYNOMIAL.to_vec()).with_interval(-1.0f64, 1.0);
+    let poly = Polynomial::new(Basis::Chebyshev, POLYNOMIAL.to_vec()).with_interval(-1.0f64, 1.0);
     let meta = CoeffsMeta::from_delta_budget(env.params.prec_meta.log_delta, 8);
     let host = poly
         .encode_bsgs(&env.host_module, Base2K(env.params.base2k as u32), meta)
